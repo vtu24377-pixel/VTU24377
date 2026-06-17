@@ -161,3 +161,141 @@ For real-time communication, I chose WebSockets because they allow the server to
 * Users can only view notifications intended for them.
 * Administrators are responsible for creating and managing notifications.
 * The system should support additional notification categories in the future without requiring major API changes.
+
+---
+
+# Stage 2
+
+## Database Choice
+
+For this notification platform, I would prefer using PostgreSQL.
+
+My reason for choosing PostgreSQL is that the data in this system is highly structured. Every notification is connected to a student, and we also need to track whether a notification has been read or not. Since these records have clear relationships, a relational database is a good fit.
+
+Another advantage is that PostgreSQL provides good query performance through indexing and is reliable when handling large amounts of data.
+
+---
+
+## Database Schema
+
+### Students
+
+This table stores student information.
+
+| Column     | Type    |
+| ---------- | ------- |
+| student_id | UUID    |
+| name       | VARCHAR |
+| email      | VARCHAR |
+| department | VARCHAR |
+
+### Notifications
+
+This table stores the notification details.
+
+| Column          | Type      |
+| --------------- | --------- |
+| notification_id | UUID      |
+| category        | VARCHAR   |
+| title           | VARCHAR   |
+| message         | TEXT      |
+| priority        | VARCHAR   |
+| created_at      | TIMESTAMP |
+
+### Student_Notifications
+
+This table acts as a bridge between students and notifications.
+
+| Column          | Type      |
+| --------------- | --------- |
+| id              | UUID      |
+| student_id      | UUID      |
+| notification_id | UUID      |
+| is_read         | BOOLEAN   |
+| delivered_at    | TIMESTAMP |
+
+This design allows a single notification to be delivered to multiple students while also tracking individual read status.
+
+---
+
+## Challenges as the System Grows
+
+Initially the system may perform well, but as the number of students and notifications increases, a few issues can arise:
+
+1. Fetching notifications may become slower.
+2. Database size will continue to grow.
+3. Peak notification periods can generate heavy traffic.
+4. Read and unread notification queries may take longer to execute.
+
+---
+
+## Possible Improvements
+
+### Indexing
+
+Indexes can be created on frequently used columns such as:
+
+* student_id
+* notification_id
+* created_at
+* is_read
+
+This helps reduce query execution time.
+
+### Pagination
+
+Instead of loading every notification at once, notifications should be loaded in smaller batches.
+
+Example:
+
+```text
+GET /api/v1/notifications?page=1&limit=10
+```
+
+This improves performance and reduces unnecessary data transfer.
+
+### Archiving Old Notifications
+
+Older notifications that are no longer frequently accessed can be moved to archive tables. This keeps the active tables smaller and improves performance.
+
+### Redis Caching
+
+Frequently requested notification data can be stored in Redis. This reduces repeated database access and improves response times.
+
+---
+
+## SQL vs NoSQL
+
+### PostgreSQL (SQL)
+
+Pros:
+
+* Strong consistency
+* Easy to manage relationships
+* Structured data storage
+* Reliable transaction support
+
+Cons:
+
+* Schema updates require migrations
+* Horizontal scaling is more challenging
+
+### MongoDB (NoSQL)
+
+Pros:
+
+* Flexible document structure
+* Easier horizontal scaling
+* Suitable for rapidly changing data models
+
+Cons:
+
+* Relationship management is less straightforward
+* Maintaining consistency can be more difficult
+
+---
+
+## Final Decision
+
+Although both SQL and NoSQL databases can be used, I would select PostgreSQL for this project. Since notifications are linked to students and their read status, maintaining these relationships is important. PostgreSQL provides a clean structure, good performance through indexing, and reliable data consistency, which makes it a suitable choice for a campus notification system.
+
