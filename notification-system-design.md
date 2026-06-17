@@ -408,3 +408,104 @@ AND createdAt >= NOW() - INTERVAL '7 days';
 ### Explanation
 
 This query returns the unique student IDs of students who received placement-related notifications during the last seven days.
+
+---
+
+# Stage 4
+
+## Boosting System Performance
+
+If every single student device pings the database directly just to fetch notifications, the database is going to crash under heavy load. As our user base grows, this setup will slow down the app and ruin the student experience.
+
+To fix this and keep the system fast, here is how I would optimize it.
+
+## 1. Pagination
+
+Instead of dumping hundreds of notifications onto the frontend all at once, we split them into small, manageable chunks.
+
+How it looks:
+
+GET /api/v1/notifications?page=1&limit=10
+
+### Advantages
+
+* Lightens the database load.
+* Cuts down network payload size.
+* Speeds up the API response.
+
+### Disadvantages
+
+* If a student wants to see older notifications, the client has to trigger additional API calls to fetch more pages.
+
+---
+
+## 2. Redis Caching
+
+For notifications that students check constantly, we can store them in an in-memory Redis cache. The app looks there first before querying the main database.
+
+### Advantages
+
+* Significant reduction in database traffic.
+* Faster read speeds.
+* Useful during high-traffic periods such as exam result announcements.
+
+### Disadvantages
+
+* Adds another component that needs maintenance.
+* Cache invalidation must be handled carefully to avoid stale data.
+
+---
+
+## 3. WebSockets for Live Push
+
+Instead of making the frontend constantly poll the server or refresh manually, we establish a persistent two-way connection.
+
+### Advantages
+
+* Notifications are delivered instantly.
+* Reduces unnecessary database queries.
+* Improves user experience.
+
+### Disadvantages
+
+* More complex to implement than REST APIs.
+* Requires management of many active connections.
+
+---
+
+## 4. Smart Database Indexing
+
+Queries become slower when the database scans millions of rows. Creating indexes on student_id, is_read, and created_at can improve performance.
+
+### Advantages
+
+* Faster searching and filtering.
+* Better performance on large datasets.
+
+### Disadvantages
+
+* Consumes additional storage.
+* Insert and update operations become slightly slower.
+
+---
+
+## 5. Data Archiving
+
+Old notifications can be moved to archive tables to keep active tables smaller.
+
+### Advantages
+
+* Keeps production tables lean.
+* Improves query performance.
+
+### Disadvantages
+
+* Accessing archived notifications may require additional queries.
+
+---
+
+## Summary of My Strategy
+
+Instead of betting everything on just one fix, I will use a hybrid approach. I'll implement database indexing and pagination as the baseline, layer on Redis for fast reads of recent alerts, and use WebSockets to push live updates. This multi-layered approach keeps the database safe from traffic spikes while keeping the application responsive for students.
+
+
