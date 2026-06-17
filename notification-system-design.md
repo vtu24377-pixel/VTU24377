@@ -508,4 +508,83 @@ Old notifications can be moved to archive tables to keep active tables smaller.
 
 Instead of betting everything on just one fix, I will use a hybrid approach. I'll implement database indexing and pagination as the baseline, layer on Redis for fast reads of recent alerts, and use WebSockets to push live updates. This multi-layered approach keeps the database safe from traffic spikes while keeping the application responsive for students.
 
+---
+
+# Stage 5
+
+## Problems with the Current Implementation
+
+The current approach sends notifications one student at a time using a loop. This may work when the number of students is small, but it becomes a problem when HR wants to notify all 50,000 students at once.
+
+One issue is that sending emails to thousands of students sequentially will take a lot of time. Another problem is that if an error occurs while processing a student, the remaining students may not receive their notifications. The application server will also be busy handling email requests, database operations, and push notifications together, which can affect overall performance.
+
+---
+
+## My Approach
+
+Instead of processing everything directly, I would use a message queue such as RabbitMQ.
+
+When HR clicks "Notify All", the application should create notification jobs and place them into a queue. Different workers can then process these jobs in the background.
+
+```text id="z8mjxh"
+HR clicks "Notify All"
+        |
+        v
+Notification Service
+        |
+        v
+    Message Queue
+      /    |    \
+     /     |     \
+ Email    DB    Push
+Worker  Worker Worker
+```
+
+This way, the application does not have to wait for every email and notification to be sent before responding.
+
+---
+
+## Should Database Saving and Email Sending Happen Together?
+
+No.
+
+I would keep them separate because they are independent operations.
+
+For example, if the email service is temporarily unavailable, the notification can still be saved in the database and shown inside the application. The failed email can be retried later without affecting other parts of the system.
+
+---
+
+## Revised Pseudocode
+
+```python
+function notify_all(student_ids, message):
+
+    for student_id in student_ids:
+        queue.publish({
+            student_id: student_id,
+            message: message
+        })
+
+worker process_notification:
+
+    job = queue.consume()
+
+    save_to_db(job.student_id, job.message)
+    send_email(job.student_id, job.message)
+    push_to_app(job.student_id, job.message)
+```
+
+---
+
+## Advantages
+
+* Faster processing of notifications.
+* Easier to handle a large number of users.
+* Failures in one service do not stop the entire process.
+* Failed jobs can be retried later.
+* Reduces load on the main application server.
+
+## Conclusion
+
+For a notification system that needs to serve thousands of students, using a message queue is a better option than processing everything inside a single loop. It makes the system faster, more reliable, and easier to scale as the number of users grows.
 
