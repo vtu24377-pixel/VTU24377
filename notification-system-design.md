@@ -299,3 +299,112 @@ Cons:
 
 Although both SQL and NoSQL databases can be used, I would select PostgreSQL for this project. Since notifications are linked to students and their read status, maintaining these relationships is important. PostgreSQL provides a clean structure, good performance through indexing, and reliable data consistency, which makes it a suitable choice for a campus notification system.
 
+---
+
+# Stage 3
+
+## Analysis of the Given Query
+
+```sql
+SELECT *
+FROM notifications
+WHERE studentID = 1042
+AND isRead = false
+ORDER BY createdAt ASC;
+```
+
+### Is the Query Correct?
+
+Yes, the query is correct because it fetches all unread notifications of a particular student and sorts them based on when they were created.
+
+However, even though the query gives the correct result, it may become slow when the notifications table contains millions of records.
+
+---
+
+## Why is the Query Slow?
+
+There are a few reasons why this query may not perform well:
+
+1. It uses `SELECT *`, which means every column is fetched even when all the data may not be needed.
+2. If there is no index on `studentID` and `isRead`, the database has to check a large number of rows before finding the required records.
+3. Sorting using `ORDER BY createdAt` can take additional time when many notifications match the condition.
+4. As the number of notifications grows, the database needs more time and resources to process the query.
+
+---
+
+## Suggested Improvements
+
+### Avoid Using SELECT *
+
+Instead of fetching all columns, only the required fields should be selected.
+
+```sql
+SELECT notification_id,
+       title,
+       message,
+       createdAt
+FROM notifications
+WHERE studentID = 1042
+AND isRead = false
+ORDER BY createdAt ASC;
+```
+
+This reduces unnecessary data retrieval and improves performance.
+
+### Add an Index
+
+I would create an index on the columns that are frequently used in filtering and sorting.
+
+```sql
+CREATE INDEX idx_student_read_created
+ON notifications(studentID, isRead, createdAt);
+```
+
+This helps the database find matching records much faster.
+
+---
+
+## Is Adding an Index Safe?
+
+Yes, adding an index is generally a good idea because it improves query performance.
+
+### Advantages
+
+* Faster data retrieval
+* Better filtering performance
+* Faster sorting
+
+### Disadvantages
+
+* Extra storage space is required
+* Insert and update operations may become slightly slower because the index also needs to be updated
+
+---
+
+## Will an Index Completely Solve the Problem?
+
+No.
+
+An index will improve performance, but it is not the only solution. As the amount of data keeps increasing, other optimizations may also be required such as:
+
+* Pagination
+* Caching using Redis
+* Archiving old notifications
+* Database partitioning
+
+Using multiple optimization techniques together will give better long-term performance.
+
+---
+
+## Query to Find Students Who Received Placement Notifications in the Last 7 Days
+
+```sql
+SELECT DISTINCT studentID
+FROM notifications
+WHERE notificationType = 'Placement'
+AND createdAt >= NOW() - INTERVAL '7 days';
+```
+
+### Explanation
+
+This query returns the unique student IDs of students who received placement-related notifications during the last seven days.
